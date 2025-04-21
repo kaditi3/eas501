@@ -1,0 +1,122 @@
+---
+title: "Interactive Molasses-Methane Calculator"
+format: 
+  html:
+    page-layout: full
+    code-fold: true
+server: shiny
+---
+
+```{r setup}
+#| include: false
+library(shiny)
+library(reticulate)
+```
+
+## Introduction
+
+This interactive calculator helps you:
+
+1. Calculate the amount of molasses required to produce a specific amount of methane
+2. Calculate the amount of CO2 and CH4 produced from a given amount of molasses
+
+The calculations are based on the biochemical pathway:
+Sucrose → Glucose → Ethanol → Methane + CO2
+
+## Calculator
+
+```{python}
+#| context: setup
+# Define molecular weights
+MW_sucrose = 342.30  # g/mol
+MW_glucose = 180.18  # g/mol
+MW_ethanol = 46.08   # g/mol
+MW_CO2 = 44.01       # g/mol
+MW_CH4 = 16.04       # g/mol
+
+# Percentage of sucrose in molasses by weight
+sucrose_content = 0.50  # 50%
+
+def calculate_molasses_for_methane(methane_kg):
+    """Calculate molasses required for a specific amount of methane."""
+    # Calculations
+    desired_methane_g = methane_kg * 1000
+    moles_CH4_required = desired_methane_g / MW_CH4
+    moles_ethanol_required = (2 / 3) * moles_CH4_required
+    moles_glucose_required = moles_ethanol_required / 2
+    moles_sucrose_required = moles_glucose_required / 2
+    mass_sucrose_required = moles_sucrose_required * MW_sucrose
+    mass_molasses_required = mass_sucrose_required / sucrose_content
+    mass_molasses_required_tonnes = mass_molasses_required / 1000000
+    
+    return mass_molasses_required_tonnes
+
+def calculate_gases_from_molasses(molasses_tonnes):
+    """Calculate the amount of CO2 and CH4 produced from molasses."""
+    # Calculations
+    molasses_mass_g = molasses_tonnes * 1000000
+    sucrose_mass = molasses_mass_g * sucrose_content
+    moles_sucrose = sucrose_mass / MW_sucrose
+    moles_glucose = 2 * moles_sucrose
+    moles_ethanol = 2 * moles_glucose
+    moles_CH4 = 1.5 * moles_ethanol
+    moles_CO2_from_glucose = 2 * moles_glucose
+    moles_CO2_from_ethanol = 0.5 * moles_ethanol
+    total_moles_CO2 = moles_CO2_from_glucose + moles_CO2_from_ethanol
+    total_mass_CO2_kg = (total_moles_CO2 * MW_CO2) / 1000
+    total_mass_CH4_kg = (moles_CH4 * MW_CH4) / 1000
+    
+    return total_mass_CO2_kg, total_mass_CH4_kg
+```
+
+```{r}
+#| panel: sidebar
+tabsetPanel(
+  tabPanel("Molasses Required",
+    numericInput("methane_kg", "Desired methane (kg):", value = 1.0, min = 0.01),
+    actionButton("calculate1", "Calculate", class = "btn-primary"),
+    hr(),
+    verbatimTextOutput("molasses_result")
+  ),
+  tabPanel("Gas Production",
+    numericInput("molasses_tonnes", "Molasses input (tonnes):", value = 1.0, min = 0.01),
+    actionButton("calculate2", "Calculate", class = "btn-primary"),
+    hr(),
+    verbatimTextOutput("gas_result")
+  )
+)
+```
+
+```{r}
+#| panel: fill
+
+observeEvent(input$calculate1, {
+  methane_kg <- input$methane_kg
+  result <- py$calculate_molasses_for_methane(methane_kg)
+  output$molasses_result <- renderText({
+    paste0("Total molasses required: ", format(result, digits = 3), " metric tonnes")
+  })
+})
+
+observeEvent(input$calculate2, {
+  molasses_tonnes <- input$molasses_tonnes
+  result <- py$calculate_gases_from_molasses(molasses_tonnes)
+  output$gas_result <- renderText({
+    paste0(
+      "CO2 produced: ", format(result[[0]], digits = 3), " kilograms\n",
+      "CH4 produced: ", format(result[[1]], digits = 3), " kilograms"
+    )
+  })
+})
+```
+
+## Reaction Pathway
+
+The calculator uses these simplified biochemical reactions:
+
+1. Sucrose (C₁₂H₂₂O₁₁) → 2 Glucose (C₆H₁₂O₆)
+2. Glucose (C₆H₁₂O₆) → 2 Ethanol (C₂H₅OH) + 2 CO₂
+3. 2 Ethanol (C₂H₅OH) → 3 CH₄ + 1 CO₂
+
+Note: These are simplified reactions. Actual bioprocesses may have different yields.
+---

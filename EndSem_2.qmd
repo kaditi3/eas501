@@ -1,0 +1,132 @@
+---
+title: "Molasses to Methane Calculator from Cowboy Clean Fuel's Carbon Sequestraion Process"
+runtime: shiny
+editor: visual
+format: html
+output-options:
+  launch_browser: true
+---
+
+The following diagram gives a general overview of the carbon sequestration process that occurs in an abandoned coal bed methane field, which is injected with molasses by Cowboy Clean Fuels, to produce Renewable Natural Gas essentially, Methane, (CH4) along with sequestering CO2 in the cracks of the subsurface. The final products sold in the market are RNG & Carbon Credits. Going further, RNG shall be referred to as Methane.
+
+::: {style="text-align: center;"}
+<img src="CCF_process.png" alt="Molasses to Methane" width="800" style="display:block; margin:auto;"/>
+
+<figcaption>Fig 1.</figcaption>
+:::
+
+This document calculates the required molasses for a specific amount of methane to be produced, or the production of CO2 and CH4 from a given amount of molasses. The reactions shown in Fig 3. are found to be occurring in the subsurface of San Juan Basin, which covers 7,500 square miles and resides in northwestern New Mexico, southwestern Colorado, and parts of Utah and Arizona, as shown in Fig 2.
+
+::: {style="text-align: center;"}
+<img src="SJB_US_Map.png" alt="Molasses to Methane" width="400" style="display:block; margin:auto;"/>
+
+<figcaption>Fig 2.</figcaption>
+:::
+
+::: {style="text-align: center;"}
+<img src="molasses_to_methane.png" alt="Molasses to Methane" width="400" style="display:block; margin:auto;"/>
+
+<figcaption>Fig 3.</figcaption>
+:::
+
+### Calculate Molasses Required for Methane
+
+```{r}
+library(shiny)
+# Define molecular weights
+MW_sucrose <- 342.30  # g/mol
+MW_glucose <- 180.18  # g/mol
+MW_ethanol <- 46.08   # g/mol
+MW_CO2 <- 44.01       # g/mol
+MW_CH4 <- 16.04       # g/mol
+
+# Percentage of sucrose in molasses by weight
+sucrose_content <- 0.50  # 50%
+
+calculate_molasses_required_for_methane <- function(desired_methane_kg) {
+  # Calculate amount of molasses required for a specific amount of methane.
+  desired_methane_g <- desired_methane_kg * 1000
+  moles_CH4_required <- desired_methane_g / MW_CH4
+  moles_ethanol_required <- (2 / 3) * moles_CH4_required
+  moles_glucose_required <- moles_ethanol_required / 2
+  moles_sucrose_required <- moles_glucose_required / 2
+  mass_sucrose_required <- moles_sucrose_required * MW_sucrose
+  mass_molasses_required <- mass_sucrose_required / sucrose_content
+  mass_molasses_required_tonnes <- mass_molasses_required / 1000000
+  return(mass_molasses_required_tonnes)
+}
+
+#Example calculation
+#desired_methane_kg <- 100  # Example value in kilograms
+#result <- calculate_molasses_required_for_methane(desired_methane_kg)
+#cat(sprintf("Total molasses required for %d kg of methane: %.3f metric tonnes\n", desired_methane_kg, result))
+
+calculate_CO2_and_CH4_from_molasses <- function(molasses_mass_tonnes) {
+  # Calculate the amount of CO2 and CH4 produced from a given amount of molasses.
+  molasses_mass_g <- molasses_mass_tonnes * 1000000
+  sucrose_mass <- molasses_mass_g * sucrose_content
+  moles_sucrose <- sucrose_mass / MW_sucrose
+  moles_glucose <- 2 * moles_sucrose
+  moles_ethanol <- 2 * moles_glucose
+  moles_CH4 <- 1.5 * moles_ethanol
+  moles_CO2_from_glucose <- 2 * moles_glucose
+  moles_CO2_from_ethanol <- 0.5 * moles_ethanol
+  total_moles_CO2 <- moles_CO2_from_glucose + moles_CO2_from_ethanol
+  total_mass_CO2_kg <- (total_moles_CO2 * MW_CO2) / 1000
+  total_mass_CH4_kg <- (moles_CH4 * MW_CH4) / 1000
+  return(list(CO2 = total_mass_CO2_kg, CH4 = total_mass_CH4_kg))
+}
+
+#remove below hases for examples
+# Example calculation
+#molasses_mass_tonnes <- 10  # Example value in metric tonnes
+#co2_ch4 <- calculate_CO2_and_CH4_from_molasses(molasses_mass_tonnes)
+#cat(sprintf("CO2 produced from %d metric tonnes of molasses: %.3f kg\n", molasses_mass_tonnes, co2_ch4[1]))
+#cat(sprintf("CH4 produced from %d metric tonnes of molasses: %.3f kg\n", molasses_mass_tonnes, co2_ch4[2]))
+```
+
+```{r}
+ui <- fluidPage(
+  titlePanel("Molasses to Methane / CO₂ Calculator"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons("mode", "Choose Calculation Mode:",
+                   choices = c("Methane → Molasses" = "to_molasses", 
+                               "Molasses → CO₂ and CH₄" = "to_outputs")),
+      
+      conditionalPanel(
+        condition = "input.mode == 'to_molasses'",
+        numericInput("methane_input", "Enter desired Methane (kg):", value = 100)
+      ),
+      
+      conditionalPanel(
+        condition = "input.mode == 'to_outputs'",
+        numericInput("molasses_input", "Enter molasses (metric tonnes):", value = 10)
+      )
+    ),
+    
+    mainPanel(
+      verbatimTextOutput("result")
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$result <- renderPrint({
+    if (input$mode == "to_molasses") {
+      result <- calculate_molasses_required_for_methane(input$methane_input)
+      cat(sprintf("Total molasses required for %.2f kg of methane: %.3f metric tonnes", 
+                  input$methane_input, result))
+    } else {
+      outputs <- calculate_CO2_and_CH4_from_molasses(input$molasses_input)
+      cat(sprintf("CO₂ produced from %.2f metric tonnes of molasses: %.3f kg\n", 
+                  input$molasses_input, outputs$CO2))
+      cat(sprintf("CH₄ produced from %.2f metric tonnes of molasses: %.3f kg", 
+                  input$molasses_input, outputs$CH4))
+    }
+  })
+}
+
+shinyApp(ui, server)
+```
